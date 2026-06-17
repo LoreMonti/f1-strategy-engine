@@ -59,10 +59,13 @@ Everything is anchored to real 2024 sessions via [FastF1](https://github.com/the
 |---|---|
 | **Qualifying pace** (Bahrain) | sim vs VER pole **+0.08 s** |
 | **Qualifying pace** (Silverstone) | sim vs NOR pole **−0.16 s** |
+| **Qualifying pace** (Singapore) | sim vs NOR pole **+0.04 s** |
 | **Race pace** (Monza, optimal strategy) | sim vs LEC **−0.55 s/lap** (consistent with the known tyre-management gap) |
 | **Wet/mixed race** (Silverstone 2024, dynamic weather) | sim reconstructs HAM's real **Medium → Intermediate → Soft** strategy; race-pace **+0.71 s/lap** |
 | **Strategy validation** (Monza 2024) | with degradation **learned from data**, the optimiser independently returns the **1-stop** that won the real race |
 | **Live SC decision** (Monza, SC at L26) | recommends pulling the stop into the SC window, saving **8.3 s** = the analytical pit discount |
+| **Safety-Car exposure** (Singapore) | Monte Carlo over historical SC rates: **81 % of races neutralised** (highest on the calendar); win-probability spreads across 4 strategies instead of collapsing onto one |
+| **Live SC decision** (Singapore, SC at L20) | recommends pulling the stop from L25 to L23, saving **11.1 s** — larger than Monza because of the 28 s pit lane |
 
 ### The strongest result: data correcting the model
 
@@ -207,6 +210,7 @@ g_mult ← g_mult × base_grip × wet_factor
 | Monza 2024 | **1.92** | race pace | dry | 0 / 0 / 0 (physics already ≈ real) |
 | Silverstone 2024 | **1.85** | qualifying | **dynamic** (real 2024 mixed race) | 0 / 0 / 0 |
 | Bahrain 2024 | **1.80** | qualifying | dry | 0.047 / 0.043 / 0.038 (abrasive → adds deg) |
+| Singapore 2024 | **1.63** | qualifying | dry | 0 / 0 / 0 (smooth street → physics already ≈ real) |
 
 Learned real degradation (fuel-corrected, s/lap): Monza ≈ 0.06 all compounds; Silverstone Soft
 0.058 / Med 0.028 / Hard 0.024 / Inter 0.239; Bahrain Soft 0.14 / Med 0.12 / Hard 0.10.
@@ -232,6 +236,9 @@ python main.py -c silverstone_2024 --weather-timeline "1:0,26:0,29:0.6,36:0.4,40
 
 # Live strategy: a Safety Car is deployed at lap 26 — what's the optimal call?
 python main.py -c monza_2024 --sc-lap 26
+
+# Singapore: highest Safety-Car circuit — robustness and live SC reaction matter most
+python main.py -c singapore_2024 --sc-lap 20
 ```
 
 The interactive dashboard (Plotly/Dash) has tabs for race strategy, lap telemetry, a lap
@@ -260,7 +267,7 @@ src/
                  sc_history.py       Safety-Car probabilities from history (empirical Bayes)
                  tyre_deg.py         degradation learned from real stints
   visualization/ dashboard.py, *_plotter.py, fastf1_comparison.py, track_animator.py
-data/tracks/     monza_2024.yaml, silverstone_2024.yaml, bahrain_2024.yaml
+data/tracks/     monza_2024.yaml, silverstone_2024.yaml, bahrain_2024.yaml, singapore_2024.yaml
 tests/           pytest suite (151 tests)
 ```
 
