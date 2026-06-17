@@ -1,0 +1,19 @@
+# =========================================================
+# Simulation configuration
+# =========================================================
+
+simulation:
+  step_size: 5.0        # spatial integration step [m]
+  race_laps: 53         # Monza 2024 — loaded from track YAML if using loader
+  multi_lap_laps: 10    # laps for multi-lap preview
+
+strategy:
+  compounds: [soft, medium, hard]
+  pit_loss: 21.5         # Monza 2024 pit lane delta [s]
+  min_stint_laps: 10     # realistic minimum stint for 53-lap race
+  max_stops: 2
+  require_two_compounds: true
+  ranking_top_n: 10
+  gap_top_n: 5
+  pit_loss_sensitivity: [18.0, 19.5, 21.5, 23.5, 25.5]
+  

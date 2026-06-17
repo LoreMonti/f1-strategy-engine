@@ -1,0 +1,211 @@
+# ============================================================
+# Autodromo Nazionale di Monza — 2024 F1 Italian Grand Prix
+# ============================================================
+# Source: FIA Circuit Notes 2024, official sector times
+# Lap distance: 5.793 km  |  Race: 53 laps  |  ~306.7 km
+
+metadata:
+  name: "Autodromo Nazionale di Monza"
+  location: "Monza, Italy"
+  country: "ITA"
+  circuit_id: "monza"
+  fastf1_name: "Monza"
+  season: 2024
+  gp_name: "Italian Grand Prix"
+  race_laps: 53
+  lap_distance_km: 5.793
+  lap_record:
+    time_s: 81.046        # Rubens Barrichello, Ferrari, 2004
+    driver: "R. Barrichello"
+    year: 2004
+  drs_zones: 2
+  fia_grade: 1
+
+# ── Physical / environmental defaults ───────────────────────
+environment:
+  altitude_m: 162
+  ambient_temp_c: 26.0
+  track_temp_c: 42.0
+  humidity_pct: 45
+  typical_wind_speed_ms: 3.5
+  # Monza sits in the Po Valley — low altitude, modest heat
+  air_density_correction: 1.000   # reference at 162 m ≈ negligible correction
+
+# ── Grip / surface ───────────────────────────────────────────
+surface:
+  asphalt_type: "smooth_abrasive"   # high-speed abrasive, fast tyre warm-up
+  grip_factor: 0.92                 # relative to reference (1.0 = average circuit)
+  # Monza is hard on brakes, easy on tyres vs Barcelona/Silverstone
+  tyre_stress_factor: 0.78          # lower = softer on rubber
+  brake_stress_factor: 1.35         # heavy braking at Rettifilo, Variante Ascari
+  bump_severity: 0.20               # 0–1; Monza is relatively smooth
+
+# ── Sectors ─────────────────────────────────────────────────
+# Three official F1 sectors.
+# ref_lap_time_s is the 2024 pole baseline (Leclerc, 79.817 s qualifying)
+sectors:
+  - id: 1
+    name: "Rettifilo – Curva Grande"
+    distance_m: 1885
+    ref_time_s: 25.1
+    avg_speed_kph: 270
+    max_speed_kph: 342        # DRS straight before Variante del Rettifilo
+    min_speed_kph: 72         # Variante del Rettifilo chicane apex
+    type: "high_speed"
+    drs: true
+    overtaking_likelihood: 0.65
+    notes: "Long main straight with DRS; heavy braking into T1 chicane"
+
+  - id: 2
+    name: "Curva di Lesmo – Variante Ascari"
+    distance_m: 2108
+    ref_time_s: 27.9
+    avg_speed_kph: 272
+    max_speed_kph: 326        # Between Lesmo 2 and Ascari
+    min_speed_kph: 96         # Variante Ascari chicane
+    type: "mixed"
+    drs: false
+    overtaking_likelihood: 0.25
+    notes: "Technical Lesmo complex; Ascari chicane tests mechanical grip"
+
+  - id: 3
+    name: "Parabolica"
+    distance_m: 1800
+    ref_time_s: 26.8
+    avg_speed_kph: 241
+    max_speed_kph: 338        # Curva Parabolica exit / back straight
+    min_speed_kph: 82         # Parabolica apex
+    type: "high_speed"
+    drs: true
+    overtaking_likelihood: 0.40
+    notes: "Iconic long-radius Parabolica; second DRS zone on back straight"
+
+# ── Mini-sector speed / throttle trace ──────────────────────
+# 20 mini-sectors of ~290 m each (5793 m / 20).
+# speed_kph: representative mid-point speed
+# throttle: 0–1 fraction (1 = full throttle)
+# brake: 0–1 fraction
+# lateral_g: approximate peak lateral load
+# Used by lap_simulator integrator for fuel/ERS/tyre load calculations.
+mini_sectors:
+  #  id  dist_start  speed  throttle  brake  lateral_g  notes
+  # heading_change_deg: signed heading variation through the segment.
+  #   negative = right turn (clockwise), positive = left turn.
+  #   Sum over full lap = -360° (clockwise circuit).
+  - {id:  1, dist_m:    0, speed_kph: 320, throttle: 1.00, brake: 0.00, lateral_g: 0.5, turn: straight, heading_change_deg:   0}  # main straight
+  - {id:  2, dist_m:  290, speed_kph: 290, throttle: 0.95, brake: 0.00, lateral_g: 0.6, turn: straight, heading_change_deg:   0}  # approaching T1
+  - {id:  3, dist_m:  580, speed_kph:  80, throttle: 0.10, brake: 0.90, lateral_g: 2.8, turn: right,    heading_change_deg: -90}  # Prima Variante — grande destra
+  - {id:  4, dist_m:  870, speed_kph: 155, throttle: 0.60, brake: 0.10, lateral_g: 2.1, turn: left,     heading_change_deg: +10}  # Prima Variante — piccola sinistra
+  - {id:  5, dist_m: 1160, speed_kph: 290, throttle: 1.00, brake: 0.00, lateral_g: 0.4, turn: straight, heading_change_deg:   0}  # Curva Grande approach
+  - {id:  6, dist_m: 1450, speed_kph: 265, throttle: 0.85, brake: 0.05, lateral_g: 3.2, turn: right,    heading_change_deg: -70}  # Curva Grande (grande destra)
+  - {id:  7, dist_m: 1740, speed_kph: 305, throttle: 1.00, brake: 0.00, lateral_g: 0.5, turn: straight, heading_change_deg:   0}  # post-Grande straight
+  - {id:  8, dist_m: 2030, speed_kph: 165, throttle: 0.30, brake: 0.70, lateral_g: 2.5, turn: right,    heading_change_deg: -35}  # Variante della Roggia — destra
+  - {id:  9, dist_m: 2320, speed_kph: 240, throttle: 0.90, brake: 0.00, lateral_g: 1.8, turn: left,     heading_change_deg: +20}  # Roggia — sinistra + avvicin. Lesmo
+  - {id: 10, dist_m: 2610, speed_kph: 185, throttle: 0.55, brake: 0.30, lateral_g: 3.5, turn: right,    heading_change_deg: -55}  # Lesmo 1 (destra)
+  - {id: 11, dist_m: 2900, speed_kph: 220, throttle: 0.80, brake: 0.05, lateral_g: 3.0, turn: right,    heading_change_deg: -25}  # Lesmo 2 (destra)
+  - {id: 12, dist_m: 3190, speed_kph: 280, throttle: 1.00, brake: 0.00, lateral_g: 0.5, turn: straight, heading_change_deg:   0}  # Serraglio straight
+  - {id: 13, dist_m: 3480, speed_kph: 105, throttle: 0.10, brake: 0.85, lateral_g: 2.9, turn: right,    heading_change_deg: -60}  # Variante Ascari — destra
+  - {id: 14, dist_m: 3770, speed_kph: 155, throttle: 0.55, brake: 0.10, lateral_g: 2.4, turn: left,     heading_change_deg: +55}  # Ascari — sinistra
+  - {id: 15, dist_m: 4060, speed_kph: 310, throttle: 1.00, brake: 0.00, lateral_g: 0.4, turn: straight, heading_change_deg:   0}  # rettilineo posteriore (DRS)
+  - {id: 16, dist_m: 4350, speed_kph: 330, throttle: 1.00, brake: 0.00, lateral_g: 0.3, turn: straight, heading_change_deg:   0}  # rettilineo posteriore peak
+  - {id: 17, dist_m: 4640, speed_kph:  88, throttle: 0.08, brake: 0.95, lateral_g: 2.7, turn: right,    heading_change_deg: -20}  # Parabolica entry
+  - {id: 18, dist_m: 4930, speed_kph: 130, throttle: 0.45, brake: 0.20, lateral_g: 3.8, turn: right,    heading_change_deg: -60}  # Parabolica mid
+  - {id: 19, dist_m: 5220, speed_kph: 220, throttle: 0.80, brake: 0.00, lateral_g: 2.2, turn: right,    heading_change_deg: -30}  # Parabolica exit
+  - {id: 20, dist_m: 5510, speed_kph: 300, throttle: 1.00, brake: 0.00, lateral_g: 0.5, turn: straight, heading_change_deg:   0}  # pit straight run
+  # Total heading_change_deg = -360° (verified)
+
+# ── Tyre compounds available ─────────────────────────────────
+tyres:
+  # Pirelli nominates three compounds per event.
+  # Monza 2024: C1 (Hard), C2 (Medium), C3 (Soft)
+  available_compounds: ["C1", "C2", "C3"]
+  compound_labels: {C1: "Hard", C2: "Medium", C3: "Soft"}
+
+  # delta_s: lap time penalty vs theoretical minimum (lower = faster)
+  # deg_rate: tyre performance loss per lap (s/lap, linear approximation)
+  # wear_limit_laps: nominal maximum stint before cliff (soft degradation model)
+  # warmup_laps: laps to reach operating window
+  C1:
+    compound: "Hard"
+    color_hex: "#FFFFFF"
+    delta_s: 1.8
+    deg_rate_s_per_lap: 0.055
+    wear_limit_laps: 42
+    warmup_laps: 4
+    optimal_temp_c: 105
+    temp_window_c: [90, 120]
+
+  C2:
+    compound: "Medium"
+    color_hex: "#FFD700"
+    delta_s: 0.9
+    deg_rate_s_per_lap: 0.085
+    wear_limit_laps: 30
+    warmup_laps: 3
+    optimal_temp_c: 95
+    temp_window_c: [80, 110]
+
+  C3:
+    compound: "Soft"
+    color_hex: "#FF0000"
+    delta_s: 0.0          # baseline fastest compound
+    deg_rate_s_per_lap: 0.140
+    wear_limit_laps: 18
+    warmup_laps: 2
+    optimal_temp_c: 88
+    temp_window_c: [75, 105]
+
+# ── Pit stop data ────────────────────────────────────────────
+pit_stop:
+  pit_lane_delta_s: 21.5    # time lost vs flying lap (entry + exit + stationary)
+  stationary_time_s: 2.4    # average tyre change time 2024
+  pit_lane_speed_limit_kph: 80
+  pit_entry_dist_m: 5650    # distance along lap where pit entry begins
+  unsafe_release_risk: 0.02 # probability modifier for strategy modelling
+
+# ── Safety car / VSC probabilities (historical Monza) ───────
+safety_car:
+  sc_probability_per_lap: 0.035
+  vsc_probability_per_lap: 0.025
+  avg_sc_duration_laps: 4
+
+# ── Fuel ────────────────────────────────────────────────────
+fuel:
+  race_fuel_load_kg: 105
+  fuel_effect_s_per_kg: 0.035   # lap time gain per kg burned (standard F1 estimate)
+  consumption_kg_per_lap: 1.98  # ~105 kg / 53 laps
+
+# ── ERS / Power unit ─────────────────────────────────────────
+ers:
+  # Monza: full deployment almost every lap (long straights)
+  deployment_strategy: "full_straight"
+  available_per_lap_mj: 4.0   # max ERS harvest+deploy per lap
+  typical_deploy_mj: 3.8      # actual average at Monza (high straight % )
+
+# ── Circuit-specific compound overrides (DATA-DRIVEN, ML step 3) ──────
+# Empirical degradation overlay set from real FastF1 stints (2019-2024):
+# the learned fuel-corrected degradation (~0.06 s/lap on all compounds) is
+# already reproduced by the physics wear model alone (~0.065 s/lap), so the
+# overlay is ZERO here. The old hand-tuned overlay (0.078-0.145) was double-
+# counting and made the optimiser favour a 2-stop; with the data-driven value
+# the optimiser correctly returns the 1-stop that won the real 2024 race.
+compound_overrides:
+  Soft:   {deg_s_per_lap: 0.0}
+  Medium: {deg_s_per_lap: 0.0}
+  Hard:   {deg_s_per_lap: 0.0}
+
+# ── Circuit-specific vehicle overrides ───────────────────────
+# Monza uses nearly full ERS deployment every lap (long straights).
+# Race mode: ~80 kW net (harvesting under braking + deploy on straights).
+# Qualifying: 120 kW (overridden in main.py for the FastF1 comparison).
+vehicle_setup:
+  # ERS race deployment: 0 kW — the tyre_mu calibration was performed
+  # against real race data which already embeds ERS + traffic + energy mgmt.
+  # Adding explicit ERS here would double-count that effect.
+  # ERS is applied only for the qualifying comparison (120 kW override in main.py).
+  ers_power_kw: 0
+  # Recalibrated to race pace after the ML degradation fix (step 3): with the
+  # data-driven (zero) overlay the within-stint pace is flatter, so tyre_mu
+  # drops from 2.03 to 1.92 to keep the M-S-M L13/L33 race avg at LEC's
+  # 84.03 s. (Was 2.03 with the inflated hand-tuned overlay.)
+  tyre_mu: 1.92

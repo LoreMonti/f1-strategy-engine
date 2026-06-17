@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.eggs/
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Generated outputs (never commit plots or CSVs)
+results/
+
+# FastF1 and telemetry cache (can be GBs)
+data/cache/
+data/fastf1_cache/
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude Code session memory (local only)
+.claude/
+
+# Jupyter
+.ipynb_checkpoints/
