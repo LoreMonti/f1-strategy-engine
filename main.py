@@ -15,7 +15,7 @@ import os
 from src.models.vehicle import Vehicle
 from src.models.strategy import RaceResult
 from src.models.tyre import SOFT, INTERMEDIATE, WET
-from src.models.weather import WeatherModel
+from src.models.weather import WeatherModel, WeatherForecast
 from src.simulation.lap_simulator import LapSimulator
 from src.simulation.race_simulator import RaceSimulator
 from src.optimization.strategy_search import generate_and_simulate
@@ -193,9 +193,8 @@ def _parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def _parse_weather_forecast(spec: str, race_laps: int) -> "WeatherForecast":
+def _parse_weather_forecast(spec: str, race_laps: int) -> WeatherForecast:
     """Parse a 'prob,onset±std,peak±std,duration' CLI string into a WeatherForecast."""
-    from src.models.weather import WeatherForecast
 
     def _val_std(token: str) -> tuple[float, float]:
         if "±" in token:
