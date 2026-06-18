@@ -1,0 +1,15 @@
+# F1 Race Strategy Engine — runtime dependencies
+# Pinned to >= the versions developed against (tested on these).
+
+numpy>=2.2
+pandas>=2.3
+scipy>=1.15
+matplotlib>=3.10
+plotly>=6.8
+dash>=4.2            # interactive dashboard (dashboard.py)
+streamlit>=1.58      # web app (app.py)
+fastf1>=3.8          # real timing data (calibration, SC history, tyre degradation)
+pyyaml>=6.0          # circuit YAML loaders
+questionary>=2.1     # interactive TUI (tui.py)
+rich>=15.0           # TUI formatting
+pytest>=8.0          # test suite

@@ -237,7 +237,24 @@ Learned real degradation (fuel-corrected, s/lap): Monza ≈ 0.06 all compounds; 
 
 ## How to run
 
-Interactive (recommended):
+Install dependencies once:
+
+```bash
+pip install -r requirements.txt
+```
+
+**Web app** (interactive, browser-based — the quickest way to explore):
+
+```bash
+streamlit run app.py
+```
+
+A point-and-click front-end over the whole engine: pick a circuit, then explore
+the strategy ranking, the Safety-Car risk scatter, an uncertain rain forecast
+(Level C, with sliders) and the multi-car undercut / overcut battle. All heavy
+computation is cached, so the controls stay responsive.
+
+**Command line** (full control, interactive prompts):
 
 ```bash
 python main.py
@@ -274,15 +291,18 @@ the Monte Carlo risk distribution.
 ## Architecture
 
 ```
+app.py                           Streamlit web app (interactive front-end)
 main.py                          entry point + CLI / TUI orchestration
 src/
   models/        vehicle.py      point-mass vehicle: aero, grip, powertrain, ERS
                  tyre.py         compound wear/thermal/grip model + wet compounds
-                 weather.py      WeatherModel (static / dynamic timeline)
+                 weather.py      WeatherModel + WeatherForecast (static / dynamic / uncertain)
                  strategy.py     RaceStrategy / RaceResult / Stint dataclasses
   simulation/    lap_simulator.py    spatial integrator → lap time + telemetry
                  race_simulator.py   full race for a strategy (+ per-lap weather)
                  monte_carlo.py      stochastic SC/VSC risk engine
+                 weather_mc.py       forecast-uncertainty Monte Carlo (Level C)
+                 multi_car_simulator.py  track position + undercut / overcut
   optimization/  strategy_optimizer.py   exact DP optimum
                  strategy_search.py      brute-force sampled search
                  live_reoptimizer.py     in-race re-optimisation
@@ -291,6 +311,7 @@ src/
                  sc_history.py       Safety-Car probabilities from history (empirical Bayes)
                  tyre_deg.py         degradation learned from real stints
   visualization/ dashboard.py, *_plotter.py, fastf1_comparison.py, track_animator.py
+scripts/         make_readme_gif.py  regenerates the header animation
 data/tracks/     monza_2024.yaml, silverstone_2024.yaml, bahrain_2024.yaml, singapore_2024.yaml
 tests/           pytest suite (163 tests)
 ```
