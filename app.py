@@ -92,6 +92,42 @@ def _surface(yaml_path: str, step: float):
 
 
 @st.cache_data(show_spinner=False)
+def _wet_candidates(yaml_path: str, max_stops: int):
+    """Inter/wet-capable candidate strategies for the weather Monte Carlo.
+
+    On a dry-nominal circuit the dry DP only proposes slick plans, so the
+    forecast MC has nothing to gamble with. Here we optimise under a *fixed
+    representative shower* (a mid-race wet window) to discover good
+    intermediate strategies, then RE-SIMULATE them on the dry nominal so their
+    per-lap baseline is consistent with the weather MC (which adds the wet
+    delta from the dry reference). The shower's exact shape is only used to
+    pick sensible inter pit windows; the forecast sliders then score them.
+    """
+    track, loader, _, ri = _load(yaml_path)
+    vehicle = build_vehicle(loader.vehicle_setup() or {})
+    vehicle.fuel_mass = ri.fuel_load_kg
+    N = ri.race_laps
+    onset, dur = max(2, N // 3), max(4, N // 3)
+    kf = [(1, 0.0), (onset, 0.0), (onset + 2, 0.6),
+          (onset + 2 + dur, 0.6), (onset + 4 + dur, 0.0), (N, 0.0)]
+    wm = WeatherModel.from_keyframes([(min(l, N), w) for l, w in kf])
+    comps = list(loader.tyre_compounds().values()) + [INTERMEDIATE, WET]
+    wet_sim = RaceSimulator(LapSimulator(track, vehicle), weather=wm)
+    dp = DPStrategyOptimizer(race_simulator=wet_sim, min_stint_laps=8, verbose=False)
+    wet_results = dp.optimize(num_laps=N, compounds=comps, pit_loss=ri.pit_lane_delta_s,
+                              max_stops=max_stops, require_two_compounds=False, step_size=STEP)
+    # Re-simulate the top wet plans on the DRY nominal for a consistent baseline.
+    dry_sim = RaceSimulator(LapSimulator(track, vehicle), weather=loader.weather_model())
+    out = []
+    for r in wet_results[:4]:
+        strat = RaceStrategy(
+            r.strategy, r.stints[0].compound,
+            [PitStop(s.start_lap, s.compound, ri.pit_lane_delta_s) for s in r.stints[1:]])
+        out.append(dry_sim.simulate(N, strat, step_size=STEP))
+    return out
+
+
+@st.cache_data(show_spinner=False)
 def _baseline_telemetry(yaml_path: str):
     """One representative race-fuel lap (Soft) → telemetry channels for plotting."""
     track, loader, _, ri = _load(yaml_path)
@@ -220,15 +256,22 @@ with tab_weather:
     peak = w3.slider("Peak wetness", 0.1, 1.0, 0.6, 0.05)
     dur = w4.slider("Duration (laps)", 3, 30, 10)
     if st.button("Run weather Monte Carlo", type="primary"):
-        with st.spinner("Optimising + building response surface…"):
-            wres = _optimize(yaml_path, STEP, max_stops, with_wets=True)
+        with st.spinner("Optimising (dry + wet candidates) + building response surface…"):
+            wres = _optimize(yaml_path, STEP, max_stops, with_wets=True)   # dry-optimal (slick)
+            wet_cands = _wet_candidates(yaml_path, max_stops)              # inter/wet-capable
             surface = _surface(yaml_path, STEP)
+        # Candidate pool: the dry-optimal slick plans + the inter-gamble plans,
+        # deduplicated by name — so the forecast can shift the win% between them.
+        pool, seen = [], set()
+        for r in list(wres[:5]) + list(wet_cands):
+            if r.strategy not in seen:
+                seen.add(r.strategy); pool.append(r)
         forecast = WeatherForecast(
             rain_probability=p_rain, onset_lap_mean=onset, onset_lap_std=max(1, onset * 0.15),
             peak_wetness_mean=peak, peak_wetness_std=0.12, ramp_laps=2,
             duration_laps_mean=dur, duration_laps_std=max(1, dur * 0.3),
             race_laps=ri.race_laps)
-        wd = WeatherMonteCarlo(forecast, surface, weather, num_samples=2000).evaluate(wres[:8])
+        wd = WeatherMonteCarlo(forecast, surface, weather, num_samples=2000).evaluate(pool)
         st.metric("Sampled races that saw rain", f"{wd[0].rain_exposure_pct:.0f}%")
         wd_sorted = sorted(wd, key=lambda x: -x.win_probability)
         fig = go.Figure(go.Bar(
