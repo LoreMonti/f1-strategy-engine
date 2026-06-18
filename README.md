@@ -107,24 +107,28 @@ force balance at each step. It is deliberately simple enough to be fully transpa
 
 For each step of length `ds`, the speed and elapsed time are advanced kinematically:
 
-\[
-v_{i+1}^2   = v_i^2 + 2\dot a \dot ds     \qquad       (a = net longitudinal acceleration)\\
-dt          = ds / v_{avg}                \qquad       (v_avg = ½(v_i + v_{i+1}))\\
-lap_{time}  = \sum dt
-\]
+$$
+\begin{aligned}
+v_{i+1}^2 &= v_i^2 + 2\,a\,ds & &(a = \text{net longitudinal acceleration})\\
+dt &= ds / v_\text{avg} & &\left(v_\text{avg} = \tfrac12\,(v_i + v_{i+1})\right)\\
+t_\text{lap} &= \textstyle\sum dt
+\end{aligned}
+$$
 
 A **backward braking pass** runs before each corner: starting from the corner's grip-limited
-apex speed, it propagates the maximum speed from which the car can still brake in time
-(`v_max² = v_apex² + 2·a_brake·ds`), so the car brakes early enough — the model never enters a
-corner faster than it can physically slow down for.
+apex speed, it propagates the maximum speed from which the car can still brake in time,
+$v_\text{max}^2 = v_\text{apex}^2 + 2\,a_\text{brake}\,ds$, so the car brakes early enough — the
+model never enters a corner faster than it can physically slow down for.
 
 ### 2. Aerodynamics
 
-```
-q          = ½ · ρ · v²             dynamic pressure   (ρ = 1.225 kg/m³)
-F_drag     = q · Cd · A             drag
-F_downforce= q · Cl · A             downforce
-```
+$$
+\begin{aligned}
+q &= \tfrac12\,\rho\,v^2 & &(\rho = 1.225~\text{kg/m}^3,\ \text{dynamic pressure})\\
+F_\text{drag} &= q\,C_d\,A\\
+F_\text{downforce} &= q\,C_l\,A
+\end{aligned}
+$$
 
 `Cd`, `Cl`, `A` are per-circuit (Monza low-downforce, Silverstone high). A **dynamic aero
 balance** shifts the centre of pressure forward under braking and rearward under
@@ -132,63 +136,62 @@ acceleration / high speed, feeding the front/rear load split.
 
 ### 3. Mass and vertical load
 
-```
-m(t) = m_car + m_fuel(t)            fuel burns ~per km → car gets lighter & faster over a stint
-N    = m·g + F_downforce            vertical load on the tyres (grows with downforce at speed)
-```
+$$
+\begin{aligned}
+m(t) &= m_\text{car} + m_\text{fuel}(t) & &(\text{fuel burns per km} \to \text{car gets lighter \& faster})\\
+N &= m\,g + F_\text{downforce} & &(\text{vertical tyre load, grows with downforce at speed})
+\end{aligned}
+$$
 
 ### 4. Grip and the friction circle
 
 The core of the model. Maximum tyre force:
 
-```
-F_grip = μ · g_mult · N
-```
+$$ F_\text{grip} = \mu \cdot g_\text{mult} \cdot N $$
 
-- `μ` (`tyre_mu`) — tyre-friction coefficient, the **per-circuit calibration knob**.
-- `g_mult` — combined grip multiplier = `wear × temperature × warm-up × weather` (≤ 1).
-- `N` — vertical load (so downforce increases grip with speed).
+- $\mu$ (`tyre_mu`) — tyre-friction coefficient, the **per-circuit calibration knob**.
+- $g_\text{mult}$ — combined grip multiplier $=$ wear $\times$ temperature $\times$ warm-up $\times$ weather $(\le 1)$.
+- $N$ — vertical load (so downforce increases grip with speed).
 
 Lateral and longitudinal demands share one budget (**friction circle**):
 
-```
-F_long_available = √(F_grip² − F_lat²)
-```
+$$ F_\text{long}^\text{avail} = \sqrt{F_\text{grip}^2 - F_\text{lat}^2} $$
 
 If a corner already saturates grip laterally, no force is left to accelerate or brake — exactly
 the real compromise between cornering and traction.
 
 ### 5. Cornering speed
 
-```
-F_lat = m · v² · κ                  κ = curvature = 1/radius (with banking term)
-```
+$$ F_\text{lat} = m\,v^2\,\kappa \qquad (\kappa = \text{curvature} = 1/\text{radius, with banking term}) $$
 
-The maximum corner speed solves `μ·g_mult·N(v) = m·v²·κ` **iteratively**, because the vertical
-load `N` itself depends on `v` through downforce. Each corner's curvature is derived from its
-apex speed and lateral load in the circuit file: `κ = a_lat·g / v_apex²`.
+The maximum corner speed solves $\mu \cdot g_\text{mult} \cdot N(v) = m\,v^2\,\kappa$
+**iteratively**, because the vertical load $N$ itself depends on $v$ through downforce. Each
+corner's curvature is derived from its apex speed and lateral load in the circuit file:
+$\kappa = a_\text{lat}\,g / v_\text{apex}^2$.
 
 ### 6. Powertrain and ERS
 
-```
-T(rpm)              F1-style torque curve (rise → flat plateau → taper to rev limit)
-F_wheel    = T(rpm) · gear_ratio · final_drive · η / r_wheel
-F_power    = (P_max + P_ERS) / v        power-limited force
-F_traction = min(F_wheel, F_power, F_grip)
-a          = (F_traction − F_drag) / m  net longitudinal acceleration
-```
+$$
+\begin{aligned}
+F_\text{wheel} &= T(\text{rpm}) \cdot r_\text{gear} \cdot r_\text{final} \cdot \eta / r_\text{wheel}\\
+F_\text{power} &= (P_\text{max} + P_\text{ERS}) / v & &(\text{power-limited force})\\
+F_\text{traction} &= \min(F_\text{wheel},\ F_\text{power},\ F_\text{grip})\\
+a &= (F_\text{traction} - F_\text{drag}) / m & &(\text{net longitudinal acceleration})
+\end{aligned}
+$$
+
+where $T(\text{rpm})$ is an F1-style torque curve (rise $\to$ flat plateau $\to$ taper to the rev limit).
 
 The **MGU-K (ERS)** adds `ers_power_kw` only on straights (curvature = 0), where deployment
 actually happens; 120 kW in qualifying mode, 0 in the race calibration (which already embeds it).
 
 ### 7. Tyres — wear, temperature, degradation
 
-```
-Δwear   = wear_rate_per_km · ds_km · thermal_multiplier
-grip(wear): three-phase — gentle logarithmic drop, then a linear "cliff" past ~75 % wear
-temperature: heating (load, accel, speed, cornering) − cooling (airflow); grip peaks at T_opt
-warm-up: grip ramps to full over the first ~1.5 km of a new set
-```
+$$ \Delta\text{wear} = \text{wear\_rate\_per\_km} \cdot ds_\text{km} \cdot \text{thermal\_multiplier} $$
+
+- **grip(wear)** — three-phase: a gentle logarithmic drop, then a linear "cliff" past ~75 % wear.
+- **temperature** — heating (load, accel, speed, cornering) $-$ cooling (airflow); grip peaks at $T_\text{opt}$.
+- **warm-up** — grip ramps to full over the first ~1.5 km of a new set.
 
 On top of the physics, an **empirical degradation overlay** `deg_s_per_lap × (laps_on_tyre − 1)`
 captures the lap-time fade the grip model under-represents. **This overlay is learned from real
@@ -198,12 +201,15 @@ stint data** (Section *Tyre degradation* below), not hand-tuned.
 
 Track wetness `w ∈ [0,1]` scales grip per compound family, reproducing the real crossover:
 
-```
-slick:         max(0.30, 1 − 0.62·w)               best when dry, useless soaked
-intermediate:  max(0.55, 1 − 1.6·(w − 0.40)²)      peaks on a damp track (~40 %)
-wet:           max(0.50, 1 − 1.1·(w − 0.85)²)      peaks on a soaked track (~85 %)
-g_mult ← g_mult × base_grip × wet_factor
-```
+$$
+\begin{aligned}
+\text{slick:} & \quad \max(0.30,\ 1 - 0.62\,w) & &\text{best when dry, useless soaked}\\
+\text{intermediate:} & \quad \max(0.55,\ 1 - 1.6\,(w - 0.40)^2) & &\text{peaks on a damp track } (\sim 40\%)\\
+\text{wet:} & \quad \max(0.50,\ 1 - 1.1\,(w - 0.85)^2) & &\text{peaks on a soaked track } (\sim 85\%)
+\end{aligned}
+$$
+
+$$ g_\text{mult} \leftarrow g_\text{mult} \times \text{base\_grip} \times \text{wet\_factor} $$
 
 - **Level A** — constant wetness for the whole race.
 - **Level B** — a per-lap `WeatherModel` timeline (interpolated keyframes), so the track can dry
