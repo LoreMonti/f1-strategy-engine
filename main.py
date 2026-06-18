@@ -177,8 +177,43 @@ def _parse_args() -> argparse.Namespace:
             "Overrides --wetness and the circuit YAML weather section."
         ),
     )
+    parser.add_argument(
+        "--weather-forecast",
+        type=str,
+        default=None,
+        metavar="P,ONSET±S,PEAK±S,DUR",
+        help=(
+            "Level C uncertain forecast: run a weather Monte Carlo over an\n"
+            "uncertain rain shower. Format 'prob,onset±std,peak±std,duration'\n"
+            "(e.g. '0.7,28±4,0.6±0.15,10'). Scores the candidate strategies on\n"
+            "robustness to the forecast being wrong."
+        ),
+    )
 
     return parser.parse_args()
+
+
+def _parse_weather_forecast(spec: str, race_laps: int) -> "WeatherForecast":
+    """Parse a 'prob,onset±std,peak±std,duration' CLI string into a WeatherForecast."""
+    from src.models.weather import WeatherForecast
+
+    def _val_std(token: str) -> tuple[float, float]:
+        if "±" in token:
+            v, s = token.split("±")
+            return float(v), float(s)
+        return float(token), 0.0
+
+    prob_s, onset_s, peak_s, dur_s = [t.strip() for t in spec.split(",")]
+    onset, onset_std = _val_std(onset_s)
+    peak, peak_std = _val_std(peak_s)
+    return WeatherForecast(
+        rain_probability=float(prob_s),
+        onset_lap_mean=onset, onset_lap_std=onset_std,
+        peak_wetness_mean=peak, peak_wetness_std=peak_std,
+        ramp_laps=2,
+        duration_laps_mean=float(dur_s), duration_laps_std=max(1.0, float(dur_s) * 0.3),
+        race_laps=race_laps,
+    )
 
 
 def _parse_weather_timeline(spec: str) -> "WeatherModel":
@@ -426,6 +461,40 @@ def print_monte_carlo(distributions, num_samples: int) -> None:
         )
 
 
+def print_weather_monte_carlo(distributions, forecast, num_samples: int) -> None:
+    """Print the weather Monte Carlo table (strategies under an uncertain forecast)."""
+    _header("WEATHER MONTE CARLO — ROBUSTNESS TO AN UNCERTAIN FORECAST")
+    if not distributions:
+        print("No strategies to evaluate.")
+        return
+    rain_pct = distributions[0].rain_exposure_pct
+    print(forecast.summary())
+    print(f"Samples: {num_samples}  |  {rain_pct:.0f}% of sampled races actually saw rain")
+    print(f"P50 = median race time, spread = P95−P5 (smaller = more robust to the "
+          f"forecast being wrong), Win% = fraction of forecasts won (paired sampling)")
+    print(
+        f"\n{'Strategy':<34} | {'Determin.':>10} | {'P50':>9} | "
+        f"{'P5':>9} | {'P95':>9} | {'Spread':>7} | {'Win %':>6}"
+    )
+    print("-" * 102)
+    for d in sorted(distributions, key=lambda x: (-x.win_probability, x.p50)):
+        print(
+            f"{d.name:<34} | "
+            f"{d.deterministic_total:10.1f} | "
+            f"{d.p50:9.1f} | {d.p5:9.1f} | {d.p95:9.1f} | "
+            f"{d.robustness_s:7.1f} | {d.win_probability * 100:5.1f}%"
+        )
+    det_best = min(distributions, key=lambda x: x.deterministic_total)
+    rob_best = max(distributions, key=lambda x: x.win_probability)
+    if det_best.name != rob_best.name:
+        print(
+            f"\n  ⚠ The strategy that is fastest under the nominal forecast "
+            f"({det_best.name})\n    is NOT the most robust to forecast uncertainty: "
+            f"'{rob_best.name}' wins {rob_best.win_probability * 100:.0f}% of "
+            f"forecast scenarios (vs {det_best.win_probability * 100:.0f}%)."
+        )
+
+
 def print_decision_summary(best: RaceResult, distributions) -> None:
     """One-glance headline: fastest-on-paper vs most-robust strategy."""
     _header("RACE STRATEGY SUMMARY")
@@ -646,7 +715,9 @@ def main() -> None:
     # When the track is (or becomes) wet, add the crossover/full-wet compounds
     # so the strategy search can choose them; slicks stay available (they still
     # win in a light damp / on a drying track).
-    if max_wetness > 0.0:
+    # A Level-C forecast may bring rain even from a dry nominal timeline, so
+    # the optimiser must be able to pick the wet compounds as candidates too.
+    if max_wetness > 0.0 or getattr(args, "weather_forecast", None):
         compounds = compounds + [INTERMEDIATE, WET]
 
     lap_sim  = LapSimulator(track, vehicle, track_wetness=weather.wetness(1))
@@ -774,6 +845,22 @@ def main() -> None:
     mc_dist = MonteCarloRaceSimulator(sc_params, num_samples=_mc_n).evaluate(
         mc_strategies, deg_uncertainty=deg_uncertainty)
     print_monte_carlo(mc_dist, _mc_n)
+
+    # --- Weather Monte Carlo (Level C, optional --weather-forecast) ------
+    if getattr(args, "weather_forecast", None):
+        from src.simulation.weather_mc import WeatherMonteCarlo, build_wet_response
+        try:
+            forecast = _parse_weather_forecast(args.weather_forecast, race_laps)
+            print(f"\n[Weather C] Building lap-time response surface "
+                  f"({len(compounds)} compounds × 6 wetness levels)…")
+            surface = build_wet_response(
+                track, vehicle, {c.name: c for c in compounds},
+                step_size=strategy_step_size, fuel_mass=race_info.fuel_load_kg * 0.5)
+            wx_dist = WeatherMonteCarlo(
+                forecast, surface, weather, num_samples=_mc_n).evaluate(mc_strategies)
+            print_weather_monte_carlo(wx_dist, forecast, _mc_n)
+        except Exception as e:
+            print(f"[Weather C] forecast Monte Carlo unavailable ({e})")
 
     # --- Live re-optimisation demo (optional, --sc-lap) -----------------
     if getattr(args, "sc_lap", None) is not None:

@@ -38,8 +38,13 @@ The physics is the engine; the product is the **decision under uncertainty**.
   ERS, tyre wear/thermal model) integrated over track segments.
 - **Strategy optimiser** — exact dynamic-programming optimum over compound sequences and
   pit laps.
-- **Weather model** — static (Level A) or a per-lap dynamic timeline (Level B) reconstructed
-  from real race data; the optimiser chooses slicks / intermediates / full wets accordingly.
+- **Weather model** — static (Level A), a per-lap dynamic timeline (Level B) reconstructed
+  from real race data, or an **uncertain forecast (Level C)** whose rain timing and intensity
+  are random; the optimiser chooses slicks / intermediates / full wets accordingly.
+- **Weather Monte Carlo** — samples many timelines from an uncertain forecast and scores each
+  strategy on **robustness to the forecast being wrong** (which slick plan survives a shower,
+  whether an early-intermediate gamble pays off), reusing a precomputed lap-time-vs-wetness
+  response surface so it stays as fast as the Safety-Car Monte Carlo.
 - **Monte Carlo risk engine** — turns the single deterministic plan into a *distribution* by
   sampling Safety Cars and VSCs (with paired sampling / common random numbers for a fair
   win-probability), so strategies are compared on **robustness**, not just nominal time.
@@ -72,6 +77,7 @@ Everything is anchored to real 2024 sessions via [FastF1](https://github.com/the
 | **Safety-Car exposure** (Singapore) | Monte Carlo over historical SC rates: **81 % of races neutralised** (highest on the calendar); win-probability spreads across 4 strategies instead of collapsing onto one |
 | **Live SC decision** (Singapore, SC at L20) | recommends pulling the stop from L25 to L23, saving **11.1 s** — larger than Monza because of the 28 s pit lane |
 | **Track position** (Singapore multi-car) | with overtaking likelihood ≈ 0.25 the model produces **0 on-track passes** — every position change is an undercut or overcut, the real Marina Bay signature |
+| **Forecast uncertainty** (Level C) | the response surface places the slick→inter→wet crossovers at the right wetness (inters fastest ≈ 0.4, full wets ≈ 0.8); the weather Monte Carlo is **exact at the nominal forecast** and shows how each plan degrades as the forecast is wrong |
 
 ### The strongest result: data correcting the model
 
@@ -95,11 +101,11 @@ force balance at each step. It is deliberately simple enough to be fully transpa
 
 For each step of length `ds`, the speed and elapsed time are advanced kinematically:
 
-```
-v_{i+1}² = v_i² + 2·a·ds            (a = net longitudinal acceleration)
-dt       = ds / v_avg               (v_avg = ½(v_i + v_{i+1}))
-lap_time = Σ dt
-```
+\[
+v_{i+1}^2   = v_i^2 + 2\dot a \dot ds     \qquad       (a = net longitudinal acceleration)\\
+dt          = ds / v_{avg}                \qquad       (v_avg = ½(v_i + v_{i+1}))\\
+lap_{time}  = \sum dt
+\]
 
 A **backward braking pass** runs before each corner: starting from the corner's grip-limited
 apex speed, it propagates the maximum speed from which the car can still brake in time
@@ -248,6 +254,9 @@ python main.py -c singapore_2024 --sc-lap 20
 
 # Multi-car: undercut / overcut under sticky track position (hardest at Singapore)
 python main.py -c singapore_2024 --multi-car --num-cars 4
+
+# Level C: an uncertain rain forecast (prob, onset±std, peak±std, duration)
+python main.py -c monza_2024 --weather-forecast "0.7,28±4,0.6±0.15,10"
 ```
 
 The interactive dashboard (Plotly/Dash) has tabs for race strategy, lap telemetry, a lap
@@ -277,7 +286,7 @@ src/
                  tyre_deg.py         degradation learned from real stints
   visualization/ dashboard.py, *_plotter.py, fastf1_comparison.py, track_animator.py
 data/tracks/     monza_2024.yaml, silverstone_2024.yaml, bahrain_2024.yaml, singapore_2024.yaml
-tests/           pytest suite (157 tests)
+tests/           pytest suite (163 tests)
 ```
 
 ### Methodology notes
@@ -299,7 +308,7 @@ tests/           pytest suite (157 tests)
 python -m pytest tests/ -q
 ```
 
-157 tests cover the physics (forces, friction circle, grip), the tyre and weather models
+163 tests cover the physics (forces, friction circle, grip), the tyre and weather models
 (including the wet/slick crossover), the loaders (including exact lap-length reconstruction),
 the DP↔race-simulator coherence, the Monte Carlo (percentile ordering, win-probability
 normalisation, degradation noise), the Safety-Car estimator, the degradation fitting, the
@@ -325,7 +334,10 @@ than hidden:
   learned overlay can raise it (Bahrain) or zero it (Monza) but cannot *reduce* it below the
   physics floor (Silverstone slicks remain slightly over-degraded).
 - **Weather is data-driven, not predictive** — the Level B timeline is reconstructed from a
-  real race, not forecast.
+  real race, not forecast. The Level C forecast is a *synthetic* uncertainty model (a single
+  trapezoidal shower with Gaussian onset / intensity / duration), not a meteorological one; its
+  lap-time response surface assumes the wet penalty is fuel-/age-independent (grip-dominated),
+  which is why it is applied as a delta from the exact nominal timeline.
 - **Race pace is "every lap on the limit"** — the ~0.5 s/lap gap to real managed races is the
   expected driver/tyre-management residual, not a model error.
 - **Multi-car overtaking is a strategic abstraction** — track position is modelled at lap
