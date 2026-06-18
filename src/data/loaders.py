@@ -226,6 +226,25 @@ class TrackLoader:
         w = self._raw.get("weather", {}).get("track_wetness", 0.0)
         return max(0.0, min(1.0, float(w)))
 
+    def overtaking_likelihood(self) -> float:
+        """
+        Circuit-level ease of overtaking [0 = nearly impossible, 1 = trivial].
+
+        Computed as the mean of the per-sector ``overtaking_likelihood`` values
+        in the YAML. This drives the multi-car simulator's track-position model:
+        a low value (e.g. Singapore ≈ 0.25) makes on-track passes hard, so the
+        pit stop (undercut / overcut) becomes the primary way to gain position.
+        Defaults to 0.40 (calendar-average) if no sector data is present.
+        """
+        likelihoods = [
+            s["overtaking_likelihood"]
+            for s in self._raw.get("sectors", [])
+            if "overtaking_likelihood" in s
+        ]
+        if not likelihoods:
+            return 0.40
+        return max(0.05, min(1.0, sum(likelihoods) / len(likelihoods)))
+
     def weather_model(self) -> "WeatherModel":
         """
         Build the circuit's weather model.

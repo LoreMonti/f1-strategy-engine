@@ -560,6 +560,28 @@ def print_multi_car_result(mc_result) -> None:
         row = f"{lap_n:4d} | " + " | ".join(f"P{positions[c.name]:>11}" for c in cars)
         print(row)
 
+    # ── Undercut / overcut breakdown ──────────────────────────────────
+    events = getattr(mc_result, "overtake_events", [])
+    _header("POSITION CHANGES — UNDERCUT / OVERCUT / ON-TRACK")
+    if not events:
+        print("No position changes (grid order held to the flag).")
+        return
+    print(f"{'Lap':>4} | {'Gained by':<14} | {'Over':<14} | "
+          f"{'→ P':>3} | {'Cause':<14}")
+    print("-" * 62)
+    for ev in events:
+        print(
+            f"{ev.lap:4d} | {ev.gainer:<14} | {ev.loser:<14} | "
+            f"{ev.new_position:>3} | {ev.kind:<14}"
+        )
+    n_under = sum(1 for e in events if e.kind == "undercut")
+    n_over = sum(1 for e in events if e.kind == "overcut")
+    n_track = sum(1 for e in events if e.kind == "on-track pass")
+    print(
+        f"\nTotal: {len(events)} position changes  "
+        f"({n_under} undercut, {n_over} overcut, {n_track} on-track)."
+    )
+
 
 # ------------------------------------------------------------------ #
 # Entry point                                                        #
@@ -801,7 +823,15 @@ def main() -> None:
             strat = _rebuild_strategy(rr)
             entries.append((f"Car {i+1}", strat))
 
-        mc_sim = MultiCarSimulator(race_sim)
+        mc_sim = MultiCarSimulator(
+            race_sim,
+            overtaking_likelihood=loader.overtaking_likelihood(),
+        )
+        print(
+            f"  Overtaking likelihood: {loader.overtaking_likelihood():.2f}  "
+            f"→ pass margin {mc_sim.overtake_margin_s:.2f} s/lap "
+            f"(higher margin = harder to pass, undercut/overcut matter more)"
+        )
         mc_result = mc_sim.simulate(
             entries=entries,
             num_laps=race_laps,

@@ -45,6 +45,11 @@ The physics is the engine; the product is the **decision under uncertainty**.
   win-probability), so strategies are compared on **robustness**, not just nominal time.
 - **Live re-optimiser** — given the current race state and an event (Safety Car now, rain
   arriving), re-optimises the remaining race and returns the optimal pit call.
+- **Multi-car race with track position** — N cars on the same circuit where on-track passes
+  are hard (resistance scaled by the circuit's overtaking likelihood, e.g. Singapore ≈ 0.25
+  vs Monza ≈ 0.43), so a faster car gets stuck in dirty air. The pit stop bypasses that
+  resistance, making the **undercut** and **overcut** emerge naturally; every position change
+  is detected and classified as undercut / overcut / on-track pass.
 
 Machine learning is used **where data beats physics**: tyre degradation rates and Safety-Car
 probabilities are *learned from real races*, not hand-tuned.
@@ -66,6 +71,7 @@ Everything is anchored to real 2024 sessions via [FastF1](https://github.com/the
 | **Live SC decision** (Monza, SC at L26) | recommends pulling the stop into the SC window, saving **8.3 s** = the analytical pit discount |
 | **Safety-Car exposure** (Singapore) | Monte Carlo over historical SC rates: **81 % of races neutralised** (highest on the calendar); win-probability spreads across 4 strategies instead of collapsing onto one |
 | **Live SC decision** (Singapore, SC at L20) | recommends pulling the stop from L25 to L23, saving **11.1 s** — larger than Monza because of the 28 s pit lane |
+| **Track position** (Singapore multi-car) | with overtaking likelihood ≈ 0.25 the model produces **0 on-track passes** — every position change is an undercut or overcut, the real Marina Bay signature |
 
 ### The strongest result: data correcting the model
 
@@ -239,6 +245,9 @@ python main.py -c monza_2024 --sc-lap 26
 
 # Singapore: highest Safety-Car circuit — robustness and live SC reaction matter most
 python main.py -c singapore_2024 --sc-lap 20
+
+# Multi-car: undercut / overcut under sticky track position (hardest at Singapore)
+python main.py -c singapore_2024 --multi-car --num-cars 4
 ```
 
 The interactive dashboard (Plotly/Dash) has tabs for race strategy, lap telemetry, a lap
@@ -268,7 +277,7 @@ src/
                  tyre_deg.py         degradation learned from real stints
   visualization/ dashboard.py, *_plotter.py, fastf1_comparison.py, track_animator.py
 data/tracks/     monza_2024.yaml, silverstone_2024.yaml, bahrain_2024.yaml, singapore_2024.yaml
-tests/           pytest suite (151 tests)
+tests/           pytest suite (157 tests)
 ```
 
 ### Methodology notes
@@ -290,10 +299,11 @@ tests/           pytest suite (151 tests)
 python -m pytest tests/ -q
 ```
 
-151 tests cover the physics (forces, friction circle, grip), the tyre and weather models
+157 tests cover the physics (forces, friction circle, grip), the tyre and weather models
 (including the wet/slick crossover), the loaders (including exact lap-length reconstruction),
 the DP↔race-simulator coherence, the Monte Carlo (percentile ordering, win-probability
-normalisation, degradation noise), the Safety-Car estimator, the degradation fitting, and the
+normalisation, degradation noise), the Safety-Car estimator, the degradation fitting, the
+multi-car track-position model (undercut / overcut detection, overtaking resistance), and the
 live re-optimiser (including its weather-awareness).
 
 ---
@@ -318,6 +328,10 @@ than hidden:
   real race, not forecast.
 - **Race pace is "every lap on the limit"** — the ~0.5 s/lap gap to real managed races is the
   expected driver/tyre-management residual, not a model error.
+- **Multi-car overtaking is a strategic abstraction** — track position is modelled at lap
+  resolution (a pace-margin threshold scaled by circuit overtaking likelihood, plus a dirty-air
+  gap), not corner-by-corner wheel-to-wheel racing. It is built to make undercut / overcut
+  trade-offs emerge correctly, not to simulate individual passing moves or DRS trains in detail.
 
 ---
 

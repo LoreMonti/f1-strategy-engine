@@ -61,6 +61,7 @@ class MultiCarRaceResult:
     cars: list[CarRaceResult]    # ordered by final_position
     num_laps: int
     track: str
+    overtake_events: list = field(default_factory=list)  # OvertakeEvent list
 
     @property
     def winner(self) -> CarRaceResult:
