@@ -127,9 +127,10 @@ def _quali_compare(yaml_path: str):
     warm2 = sim.simulate(step_size=STEP, tyre_compound=comp, initial_fuel_mass=3.0,
                          initial_speed=warm["final_speed"], initial_gear=warm["final_gear"])
     st_tel = sim.build_telemetry(warm2["points"])
-    sim = {"s": np.asarray(st_tel["s"]), "v_kmh": np.asarray(st_tel["v_kmh"])}
-    real = {"s": np.asarray(real["s"]), "v_kmh": np.asarray(real["speed_kmh"])}
-    return sim, real, warm2["total_time"]
+    sim_out = {"s": np.asarray(st_tel["s"]), "v_kmh": np.asarray(st_tel["v_kmh"])}
+    real_out = {"s": np.asarray(real["s"]), "v_kmh": np.asarray(real["speed_kmh"]),
+                "driver": real["driver"], "lap_time_s": real["lap_time_s"]}
+    return sim_out, real_out, warm2["total_time"]
 
 
 # ── App ───────────────────────────────────────────────────────────────────
@@ -210,7 +211,9 @@ with tab_sc:
 # ── Weather forecast (Level C) ────────────────────────────────────────────
 with tab_weather:
     st.caption("An uncertain rain shower: how robust is each plan to the forecast "
-               "being wrong?")
+               "being wrong? Set the forecast below, then press Run — this tab is "
+               "opt-in because it also re-optimises with wet compounds and builds a "
+               "wetness response surface (a few extra seconds).")
     w1, w2, w3, w4 = st.columns(4)
     p_rain = w1.slider("P(rain)", 0.0, 1.0, 0.6, 0.05)
     onset = w2.slider("Onset lap", 1, ri.race_laps, min(ri.race_laps // 2, 25))
@@ -318,17 +321,30 @@ with tab_val:
     try:
         with st.spinner("Building qualifying sim + fetching real telemetry…"):
             sim_q, real_q, sim_lap = _quali_compare(yaml_path)
-        st.metric("Simulated qualifying lap time", f"{sim_lap:.3f} s")
+        real_lap = real_q["lap_time_s"]
+        delta = sim_lap - real_lap
+        m1, m2, m3 = st.columns(3)
+        m1.metric("Simulated qualifying", f"{sim_lap:.3f} s")
+        m2.metric(f"Real pole ({real_q['driver']})", f"{real_lap:.3f} s")
+        m3.metric("Gap (sim − real)", f"{delta:+.3f} s")
+        # Normalise both to % of lap so the traces share an x-axis (the sim uses a
+        # stylised geometric track, so absolute corner positions differ slightly).
+        sx = sim_q["s"] / sim_q["s"].max() * 100.0
+        rx = real_q["s"] / real_q["s"].max() * 100.0
         fig = go.Figure()
-        fig.add_trace(go.Scatter(x=real_q["s"] / 1000.0, y=real_q["v_kmh"],
-                                 name="Real (FastF1 pole)", line=dict(color="#ef4444", width=2)))
-        fig.add_trace(go.Scatter(x=sim_q["s"] / 1000.0, y=sim_q["v_kmh"],
+        fig.add_trace(go.Scatter(x=rx, y=real_q["v_kmh"],
+                                 name=f"Real ({real_q['driver']} pole)",
+                                 line=dict(color="#ef4444", width=2)))
+        fig.add_trace(go.Scatter(x=sx, y=sim_q["v_kmh"],
                                  name="Simulated", line=dict(color=_ACCENT, width=2, dash="dot")))
-        fig.update_layout(xaxis_title="Lap distance [km]", yaxis_title="Speed [km/h]",
+        fig.update_layout(xaxis_title="Lap distance [%]", yaxis_title="Speed [km/h]",
                           template="plotly_dark", height=460,
                           legend=dict(orientation="h", y=-0.25))
         st.plotly_chart(fig, width="stretch")
-        st.caption("A close speed-trace overlay is the calibration check; the per-circuit "
-                   "pole-time gaps (e.g. Singapore +0.04 s) are in the README.")
+        st.caption("The lap-time gap is the calibration metric. The speed traces show the "
+                   "sim reproduces the real top speeds and braking events; exact corner "
+                   "positions differ because the sim track is a stylised geometric "
+                   "reconstruction, not the GPS centreline. Note: Monza is *race*-calibrated, "
+                   "so its lone-lap qualifying gap is larger by design (see README).")
     except Exception as e:
         st.warning(f"FastF1 comparison unavailable (needs network / cached data): {e}")
