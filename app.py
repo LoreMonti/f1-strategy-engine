@@ -35,6 +35,11 @@ from src.models.tyre import INTERMEDIATE, WET
 TRACK_DIR = "data/tracks"
 _ACCENT = "#16a34a"
 
+# Spatial integration step [m] for the strategy search. Fixed at the validated
+# value: coarser steps skip the corner apex/braking constraints and produce
+# physically wrong (optimistically fast) lap times, so this is NOT user-tunable.
+STEP = 50.0
+
 
 # ── Data helpers (cached) ─────────────────────────────────────────────────
 
@@ -95,12 +100,11 @@ with st.sidebar:
     st.header("Setup")
     circuit_name = st.selectbox("Circuit", list(circuits))
     yaml_path = circuits[circuit_name]
-    step = st.select_slider("Strategy search step (coarser = faster)",
-                            options=[80, 120, 160, 200], value=120)
     max_stops = st.slider("Max pit stops", 1, 3, 2)
     st.markdown("---")
-    st.caption("First run on a circuit builds the stint table (~1–2 min), then it "
-               "is cached and the controls are instant.")
+    st.caption("First run on a circuit builds the stint table (~1–2 min) at the "
+               "validated 50 m integration step, then it is cached and the controls "
+               "are instant.")
 
 track, loader, vehicle, ri = _load(yaml_path)
 weather = loader.weather_model()
@@ -117,7 +121,7 @@ tab_strat, tab_sc, tab_weather, tab_multi = st.tabs(
 # ── Strategy ranking ──────────────────────────────────────────────────────
 with tab_strat:
     with st.spinner("Optimising strategies…"):
-        results = _optimize(yaml_path, step, max_stops, with_wets=weather.max_wetness > 0)
+        results = _optimize(yaml_path, STEP, max_stops, with_wets=weather.max_wetness > 0)
     best = results[0]
     st.subheader(f"Optimal: {best.strategy}  ·  {best.total_time/60:.1f} min")
     rows = [{
@@ -132,7 +136,7 @@ with tab_sc:
     st.caption("Sampling Safety Cars / VSCs from the circuit's historical rates: "
                "which plan is robust, not just fastest on paper?")
     with st.spinner("Optimising strategies…"):
-        results = _optimize(yaml_path, step, max_stops, with_wets=weather.max_wetness > 0)
+        results = _optimize(yaml_path, STEP, max_stops, with_wets=weather.max_wetness > 0)
     sc_params = SafetyCarParams(
         sc_prob_per_lap=ri.sc_probability_per_lap,
         vsc_prob_per_lap=ri.vsc_probability_per_lap,
@@ -167,8 +171,8 @@ with tab_weather:
     dur = w4.slider("Duration (laps)", 3, 30, 10)
     if st.button("Run weather Monte Carlo", type="primary"):
         with st.spinner("Optimising + building response surface…"):
-            wres = _optimize(yaml_path, step, max_stops, with_wets=True)
-            surface = _surface(yaml_path, step)
+            wres = _optimize(yaml_path, STEP, max_stops, with_wets=True)
+            surface = _surface(yaml_path, STEP)
         forecast = WeatherForecast(
             rain_probability=p_rain, onset_lap_mean=onset, onset_lap_std=max(1, onset * 0.15),
             peak_wetness_mean=peak, peak_wetness_std=0.12, ramp_laps=2,
@@ -200,7 +204,7 @@ with tab_multi:
     st.caption("On-track passes are hard (scaled by the circuit's overtaking ease); "
                "position is won via the undercut / overcut.")
     with st.spinner("Optimising + racing…"):
-        results = _optimize(yaml_path, step, max_stops, with_wets=weather.max_wetness > 0)
+        results = _optimize(yaml_path, STEP, max_stops, with_wets=weather.max_wetness > 0)
         race_sim = RaceSimulator(LapSimulator(track, vehicle), weather=weather)
         n = min(5, len(results))
         entries = []
@@ -210,7 +214,7 @@ with tab_multi:
             entries.append((f"Car {i+1} · {r.strategy}",
                             RaceStrategy(r.strategy, stints[0].compound, pits)))
         mc = MultiCarSimulator(race_sim, overtaking_likelihood=loader.overtaking_likelihood())
-        mres = mc.simulate(entries, num_laps=ri.race_laps, step_size=step)
+        mres = mc.simulate(entries, num_laps=ri.race_laps, step_size=STEP)
     fig = go.Figure()
     for car in mres.cars:
         fig.add_trace(go.Scatter(
