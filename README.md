@@ -251,7 +251,8 @@ streamlit run app.py
 
 A point-and-click front-end over the whole engine: pick a circuit, then explore
 the strategy ranking, the Safety-Car risk scatter, an uncertain rain forecast
-(Level C, with sliders) and the multi-car undercut / overcut battle. All heavy
+(Level C, with sliders), the multi-car undercut / overcut battle, the lap
+telemetry, and the FastF1-vs-sim qualifying validation overlay. All heavy
 computation is cached, so the controls stay responsive.
 
 **Command line** (full control, interactive prompts):

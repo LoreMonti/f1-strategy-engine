@@ -34,6 +34,9 @@ from src.models.tyre import INTERMEDIATE, WET
 
 TRACK_DIR = "data/tracks"
 _ACCENT = "#16a34a"
+# Distinct per-strategy palette (used for the Safety-Car risk bubbles, etc.).
+_PALETTE = ["#16a34a", "#ef4444", "#3b82f6", "#f59e0b", "#a855f7",
+            "#06b6d4", "#ec4899", "#84cc16"]
 
 # Spatial integration step [m] for the strategy search. Fixed at the validated
 # value: coarser steps skip the corner apex/braking constraints and produce
@@ -88,6 +91,47 @@ def _surface(yaml_path: str, step: float):
                               fuel_mass=ri.fuel_load_kg * 0.5)
 
 
+@st.cache_data(show_spinner=False)
+def _baseline_telemetry(yaml_path: str):
+    """One representative race-fuel lap (Soft) → telemetry channels for plotting."""
+    track, loader, _, ri = _load(yaml_path)
+    vehicle = build_vehicle(loader.vehicle_setup() or {})  # fresh (don't mutate cache)
+    vehicle.fuel_mass = ri.fuel_load_kg
+    sim = LapSimulator(track, vehicle, track_wetness=loader.weather_model().wetness(1))
+    comp = loader.tyre_compounds().get("Soft") or list(loader.tyre_compounds().values())[0]
+    res = sim.simulate(step_size=STEP, tyre_compound=comp, initial_fuel_mass=ri.fuel_load_kg)
+    t = sim.build_telemetry(res["points"])
+    return {k: np.asarray(t[k]) for k in ("s", "v_kmh", "throttle", "brake", "gear",
+                                          "tyre_temperature", "grip_usage")}, res["total_time"]
+
+
+@st.cache_data(show_spinner=False)
+def _quali_compare(yaml_path: str):
+    """Sim qualifying lap (low fuel + ERS) vs real FastF1 pole telemetry.
+
+    Returns (sim, real, sim_lap_time) or raises — the caller guards for the
+    network-dependent FastF1 fetch.
+    """
+    from src.data.fastf1_loader import get_qualifying_telemetry
+    track, loader, _, ri = _load(yaml_path)
+    fastf1_name = loader.fastf1_name()
+    if not fastf1_name:
+        raise RuntimeError("circuit has no FastF1 name")
+    real = get_qualifying_telemetry(fastf1_name, ri.season)
+
+    vehicle = build_vehicle(loader.vehicle_setup() or {})  # fresh
+    vehicle.ers_power_kw = 120.0          # qualifying ERS mode
+    sim = LapSimulator(track, vehicle, track_wetness=loader.weather_model().wetness(1))
+    comp = loader.tyre_compounds().get("Soft") or list(loader.tyre_compounds().values())[0]
+    warm = sim.simulate(step_size=STEP, tyre_compound=comp, initial_fuel_mass=3.0)
+    warm2 = sim.simulate(step_size=STEP, tyre_compound=comp, initial_fuel_mass=3.0,
+                         initial_speed=warm["final_speed"], initial_gear=warm["final_gear"])
+    st_tel = sim.build_telemetry(warm2["points"])
+    sim = {"s": np.asarray(st_tel["s"]), "v_kmh": np.asarray(st_tel["v_kmh"])}
+    real = {"s": np.asarray(real["s"]), "v_kmh": np.asarray(real["speed_kmh"])}
+    return sim, real, warm2["total_time"]
+
+
 # ── App ───────────────────────────────────────────────────────────────────
 
 st.set_page_config(page_title="F1 Race Strategy Engine", page_icon="🏁", layout="wide")
@@ -115,8 +159,9 @@ c2.metric("Lap distance", f"{ri.lap_distance_km:.3f} km")
 c3.metric("Pit loss", f"{ri.pit_lane_delta_s:.1f} s")
 c4.metric("Overtaking ease", f"{loader.overtaking_likelihood():.2f}")
 
-tab_strat, tab_sc, tab_weather, tab_multi = st.tabs(
-    ["📋 Strategy", "🟡 Safety-Car risk", "🌧 Weather forecast (Level C)", "🏎 Multi-car battle"])
+tab_strat, tab_sc, tab_weather, tab_multi, tab_tel, tab_val = st.tabs(
+    ["📋 Strategy", "🟡 Safety-Car risk", "🌧 Weather forecast (Level C)",
+     "🏎 Multi-car battle", "📈 Lap telemetry", "🆚 FastF1 vs Sim"])
 
 # ── Strategy ranking ──────────────────────────────────────────────────────
 with tab_strat:
@@ -146,10 +191,12 @@ with tab_sc:
     neu = dist[0].neutralisation_pct
     st.metric("Races neutralised (SC or VSC)", f"{neu:.0f}%")
     fig = go.Figure()
-    for d in dist:
+    for i, d in enumerate(dist):
         fig.add_trace(go.Scatter(
             x=[d.p50], y=[d.p95], mode="markers+text",
-            marker=dict(size=10 + d.win_probability * 60, color=_ACCENT, opacity=0.6),
+            marker=dict(size=12 + d.win_probability * 60,
+                        color=_PALETTE[i % len(_PALETTE)], opacity=0.75,
+                        line=dict(width=1, color="#0d1117")),
             text=[f"{d.win_probability*100:.0f}%"], textposition="top center",
             name=d.name))
     fig.update_layout(
@@ -237,3 +284,51 @@ with tab_multi:
                    f"{n_t} on-track.")
     else:
         st.info("Grid order held to the flag (no position changes).")
+
+# ── Lap telemetry ─────────────────────────────────────────────────────────
+with tab_tel:
+    st.caption("One representative race-fuel lap (Soft) — the physics under the "
+               "strategy layer: speed, throttle/brake, gear and tyre state vs distance.")
+    with st.spinner("Simulating lap…"):
+        tel, lap_t = _baseline_telemetry(yaml_path)
+    st.metric("Simulated lap time (race fuel, Soft)", f"{lap_t:.3f} s")
+    s_km = tel["s"] / 1000.0
+    from plotly.subplots import make_subplots
+    fig = make_subplots(
+        rows=4, cols=1, shared_xaxes=True, vertical_spacing=0.05,
+        subplot_titles=("Speed [km/h]", "Throttle / Brake [%]", "Gear", "Tyre temp [°C]"))
+    fig.add_trace(go.Scatter(x=s_km, y=tel["v_kmh"], line=dict(color=_ACCENT),
+                             name="Speed"), row=1, col=1)
+    fig.add_trace(go.Scatter(x=s_km, y=tel["throttle"], line=dict(color="#16a34a"),
+                             name="Throttle"), row=2, col=1)
+    fig.add_trace(go.Scatter(x=s_km, y=tel["brake"], line=dict(color="#ef4444"),
+                             name="Brake"), row=2, col=1)
+    fig.add_trace(go.Scatter(x=s_km, y=tel["gear"], line=dict(color="#3b82f6", shape="hv"),
+                             name="Gear"), row=3, col=1)
+    fig.add_trace(go.Scatter(x=s_km, y=tel["tyre_temperature"], line=dict(color="#f59e0b"),
+                             name="Tyre temp"), row=4, col=1)
+    fig.update_xaxes(title_text="Lap distance [km]", row=4, col=1)
+    fig.update_layout(template="plotly_dark", height=720, showlegend=False)
+    st.plotly_chart(fig, width="stretch")
+
+# ── FastF1 vs Sim (validation) ────────────────────────────────────────────
+with tab_val:
+    st.caption("Validation: the simulated qualifying lap (low fuel + ERS) overlaid on "
+               "the real pole lap from FastF1. Needs internet on first run (then cached).")
+    try:
+        with st.spinner("Building qualifying sim + fetching real telemetry…"):
+            sim_q, real_q, sim_lap = _quali_compare(yaml_path)
+        st.metric("Simulated qualifying lap time", f"{sim_lap:.3f} s")
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(x=real_q["s"] / 1000.0, y=real_q["v_kmh"],
+                                 name="Real (FastF1 pole)", line=dict(color="#ef4444", width=2)))
+        fig.add_trace(go.Scatter(x=sim_q["s"] / 1000.0, y=sim_q["v_kmh"],
+                                 name="Simulated", line=dict(color=_ACCENT, width=2, dash="dot")))
+        fig.update_layout(xaxis_title="Lap distance [km]", yaxis_title="Speed [km/h]",
+                          template="plotly_dark", height=460,
+                          legend=dict(orientation="h", y=-0.25))
+        st.plotly_chart(fig, width="stretch")
+        st.caption("A close speed-trace overlay is the calibration check; the per-circuit "
+                   "pole-time gaps (e.g. Singapore +0.04 s) are in the README.")
+    except Exception as e:
+        st.warning(f"FastF1 comparison unavailable (needs network / cached data): {e}")
