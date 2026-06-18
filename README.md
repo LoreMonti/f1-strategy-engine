@@ -109,11 +109,13 @@ For each step of length `ds`, the speed and elapsed time are advanced kinematica
 
 $$
 \begin{aligned}
-v_{i+1}^2 &= v_i^2 + 2\,a\,ds & &(a = \text{net longitudinal acceleration})\\
-dt &= ds / v_\text{avg} & &\left(v_\text{avg} = \tfrac12\,(v_i + v_{i+1})\right)\\
-t_\text{lap} &= \textstyle\sum dt
+v_{i+1}^2 &= v_i^2 + 2\,a\,ds\\
+dt &= ds \,/\, v_\text{avg}, \qquad v_\text{avg} = \tfrac12(v_i + v_{i+1})\\
+t_\text{lap} &= \sum dt
 \end{aligned}
 $$
+
+where $a$ is the net longitudinal acceleration.
 
 A **backward braking pass** runs before each corner: starting from the corner's grip-limited
 apex speed, it propagates the maximum speed from which the car can still brake in time,
@@ -124,11 +126,13 @@ model never enters a corner faster than it can physically slow down for.
 
 $$
 \begin{aligned}
-q &= \tfrac12\,\rho\,v^2 & &(\rho = 1.225~\text{kg/m}^3,\ \text{dynamic pressure})\\
+q &= \tfrac12\,\rho\,v^2 \quad (\text{dynamic pressure})\\
 F_\text{drag} &= q\,C_d\,A\\
 F_\text{downforce} &= q\,C_l\,A
 \end{aligned}
 $$
+
+with air density $\rho = 1.225~\text{kg/m}^3$.
 
 `Cd`, `Cl`, `A` are per-circuit (Monza low-downforce, Silverstone high). A **dynamic aero
 balance** shifts the centre of pressure forward under braking and rearward under
@@ -138,10 +142,13 @@ acceleration / high speed, feeding the front/rear load split.
 
 $$
 \begin{aligned}
-m(t) &= m_\text{car} + m_\text{fuel}(t) & &(\text{fuel burns per km} \to \text{car gets lighter \& faster})\\
-N &= m\,g + F_\text{downforce} & &(\text{vertical tyre load, grows with downforce at speed})
+m(t) &= m_\text{car} + m_\text{fuel}(t)\\
+N &= m\,g + F_\text{downforce}
 \end{aligned}
 $$
+
+Fuel burns per km, so the car gets lighter and faster over a stint; $N$ is the vertical tyre
+load and grows with downforce at speed.
 
 ### 4. Grip and the friction circle
 
@@ -174,20 +181,21 @@ $\kappa = a_\text{lat}\,g / v_\text{apex}^2$.
 $$
 \begin{aligned}
 F_\text{wheel} &= T(\text{rpm}) \cdot r_\text{gear} \cdot r_\text{final} \cdot \eta / r_\text{wheel}\\
-F_\text{power} &= (P_\text{max} + P_\text{ERS}) / v & &(\text{power-limited force})\\
+F_\text{power} &= (P_\text{max} + P_\text{ERS}) / v\\
 F_\text{traction} &= \min(F_\text{wheel},\ F_\text{power},\ F_\text{grip})\\
-a &= (F_\text{traction} - F_\text{drag}) / m & &(\text{net longitudinal acceleration})
+a &= (F_\text{traction} - F_\text{drag}) / m
 \end{aligned}
 $$
 
-where $T(\text{rpm})$ is an F1-style torque curve (rise $\to$ flat plateau $\to$ taper to the rev limit).
+$F_\text{power}$ is the power-limited force, $a$ the net longitudinal acceleration, and
+$T(\text{rpm})$ an F1-style torque curve (rise $\to$ flat plateau $\to$ taper to the rev limit).
 
 The **MGU-K (ERS)** adds `ers_power_kw` only on straights (curvature = 0), where deployment
 actually happens; 120 kW in qualifying mode, 0 in the race calibration (which already embeds it).
 
 ### 7. Tyres — wear, temperature, degradation
 
-$$ \Delta\text{wear} = \text{wear\_rate\_per\_km} \cdot ds_\text{km} \cdot \text{thermal\_multiplier} $$
+$$ \Delta\text{wear} = \text{wear rate per km} \cdot ds_\text{km} \cdot \text{thermal mult.} $$
 
 - **grip(wear)** — three-phase: a gentle logarithmic drop, then a linear "cliff" past ~75 % wear.
 - **temperature** — heating (load, accel, speed, cornering) $-$ cooling (airflow); grip peaks at $T_\text{opt}$.
@@ -203,13 +211,17 @@ Track wetness `w ∈ [0,1]` scales grip per compound family, reproducing the rea
 
 $$
 \begin{aligned}
-\text{slick:} & \quad \max(0.30,\ 1 - 0.62\,w) & &\text{best when dry, useless soaked}\\
-\text{intermediate:} & \quad \max(0.55,\ 1 - 1.6\,(w - 0.40)^2) & &\text{peaks on a damp track } (\sim 40\%)\\
-\text{wet:} & \quad \max(0.50,\ 1 - 1.1\,(w - 0.85)^2) & &\text{peaks on a soaked track } (\sim 85\%)
+\text{slick} &: \max(0.30,\ 1 - 0.62\,w)\\
+\text{intermediate} &: \max(0.55,\ 1 - 1.6\,(w - 0.40)^2)\\
+\text{wet} &: \max(0.50,\ 1 - 1.1\,(w - 0.85)^2)
 \end{aligned}
 $$
 
-$$ g_\text{mult} \leftarrow g_\text{mult} \times \text{base\_grip} \times \text{wet\_factor} $$
+- **slick** — best when dry, useless soaked.
+- **intermediate** — peaks on a damp track ($\sim 40\%$ wetness).
+- **wet** — peaks on a soaked track ($\sim 85\%$ wetness).
+
+The compound factor multiplies the grip term: $g_\text{mult} \leftarrow g_\text{mult} \times \text{base grip} \times \text{wet factor}$.
 
 - **Level A** — constant wetness for the whole race.
 - **Level B** — a per-lap `WeatherModel` timeline (interpolated keyframes), so the track can dry
