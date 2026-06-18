@@ -109,8 +109,8 @@ For each step of length `ds`, the speed and elapsed time are advanced kinematica
 
 $$
 \begin{aligned}
-v_{i+1}^2 &= v_i^2 + 2\,a\,ds\\
-dt &= ds \,/\, v_\text{avg}, \qquad v_\text{avg} = \tfrac12(v_i + v_{i+1})\\
+v_{i+1}^2 &= v_i^2 + 2 a ds\\
+dt &= ds  /  v_\text{avg}, \qquad v_\text{avg} = \tfrac12(v_i + v_{i+1})\\
 t_\text{lap} &= \sum dt
 \end{aligned}
 $$
@@ -119,16 +119,16 @@ where $a$ is the net longitudinal acceleration.
 
 A **backward braking pass** runs before each corner: starting from the corner's grip-limited
 apex speed, it propagates the maximum speed from which the car can still brake in time,
-$v_\text{max}^2 = v_\text{apex}^2 + 2\,a_\text{brake}\,ds$, so the car brakes early enough — the
+$v_\text{max}^2 = v_\text{apex}^2 + 2 a_\text{brake} ds$, so the car brakes early enough — the
 model never enters a corner faster than it can physically slow down for.
 
 ### 2. Aerodynamics
 
 $$
 \begin{aligned}
-q &= \tfrac12\,\rho\,v^2 \quad (\text{dynamic pressure})\\
-F_\text{drag} &= q\,C_d\,A\\
-F_\text{downforce} &= q\,C_l\,A
+q &= \tfrac12 \rho v^2 \quad (\text{dynamic pressure})\\
+F_\text{drag} &= q C_d A\\
+F_\text{downforce} &= q C_l A
 \end{aligned}
 $$
 
@@ -143,7 +143,7 @@ acceleration / high speed, feeding the front/rear load split.
 $$
 \begin{aligned}
 m(t) &= m_\text{car} + m_\text{fuel}(t)\\
-N &= m\,g + F_\text{downforce}
+N &= m g + F_\text{downforce}
 \end{aligned}
 $$
 
@@ -169,12 +169,12 @@ the real compromise between cornering and traction.
 
 ### 5. Cornering speed
 
-$$ F_\text{lat} = m\,v^2\,\kappa \qquad (\kappa = \text{curvature} = 1/\text{radius, with banking term}) $$
+$$ F_\text{lat} = m v^2 \kappa \qquad (\kappa = \text{curvature} = 1/\text{radius, with banking term}) $$
 
-The maximum corner speed solves $\mu \cdot g_\text{mult} \cdot N(v) = m\,v^2\,\kappa$
+The maximum corner speed solves $\mu \cdot g_\text{mult} \cdot N(v) = m v^2 \kappa$
 **iteratively**, because the vertical load $N$ itself depends on $v$ through downforce. Each
 corner's curvature is derived from its apex speed and lateral load in the circuit file:
-$\kappa = a_\text{lat}\,g / v_\text{apex}^2$.
+$\kappa = a_\text{lat} g / v_\text{apex}^2$.
 
 ### 6. Powertrain and ERS
 
@@ -211,9 +211,9 @@ Track wetness `w ∈ [0,1]` scales grip per compound family, reproducing the rea
 
 $$
 \begin{aligned}
-\text{slick} &: \max(0.30,\ 1 - 0.62\,w)\\
-\text{intermediate} &: \max(0.55,\ 1 - 1.6\,(w - 0.40)^2)\\
-\text{wet} &: \max(0.50,\ 1 - 1.1\,(w - 0.85)^2)
+\text{slick} &: \max(0.30,\ 1 - 0.62 w)\\
+\text{intermediate} &: \max(0.55,\ 1 - 1.6 (w - 0.40)^2)\\
+\text{wet} &: \max(0.50,\ 1 - 1.1 (w - 0.85)^2)
 \end{aligned}
 $$
 
