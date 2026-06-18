@@ -129,7 +129,7 @@ with tab_strat:
         "Gap [s]": round(r.total_time - best.total_time, 1),
         "Stops": len(r.stints) - 1, "Avg raw [s]": round(r.average_raw_lap_time, 3),
     } for r in results[:10]]
-    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+    st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
 
 # ── Safety-Car Monte Carlo ────────────────────────────────────────────────
 with tab_sc:
@@ -157,7 +157,7 @@ with tab_sc:
         yaxis_title="Worst-case P95 [s] (lower = safer)",
         template="plotly_dark", height=430, showlegend=True,
         legend=dict(orientation="h", y=-0.3))
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
     st.caption("Bubble size = win probability. Lower-left = fast *and* safe.")
 
 # ── Weather forecast (Level C) ────────────────────────────────────────────
@@ -188,7 +188,7 @@ with tab_weather:
         fig.update_layout(xaxis_title="Win % across forecast scenarios",
                           template="plotly_dark", height=430,
                           yaxis=dict(autorange="reversed"))
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
         det_best = min(wd, key=lambda x: x.deterministic_total)
         rob_best = max(wd, key=lambda x: x.win_probability)
         if det_best.name != rob_best.name:
@@ -224,12 +224,12 @@ with tab_multi:
                       yaxis=dict(autorange="reversed", dtick=1),
                       template="plotly_dark", height=430,
                       legend=dict(orientation="h", y=-0.3))
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
     events = getattr(mres, "overtake_events", [])
     if events:
         ev_rows = [{"Lap": e.lap, "Gained by": e.gainer, "Over": e.loser,
                     "→ P": e.new_position, "Cause": e.kind} for e in events]
-        st.dataframe(pd.DataFrame(ev_rows), use_container_width=True, hide_index=True)
+        st.dataframe(pd.DataFrame(ev_rows), width="stretch", hide_index=True)
         n_u = sum(e.kind == "undercut" for e in events)
         n_o = sum(e.kind == "overcut" for e in events)
         n_t = sum(e.kind == "on-track pass" for e in events)
